@@ -6,7 +6,7 @@ function widget:GetInfo()
         author    = "[teh]decay",
         date      = "5 oct 2013",
         license   = "GNU GPL, v2 or later",
-        version   = 1,
+        version   = 2,
         layer     = 5,
         enabled   = true  --  loaded by default?
     }
@@ -15,14 +15,16 @@ end
 -- project page on github: https://github.com/jamerlan/gui_mobile_anti_defence_range
 
 --Changelog
---
+-- v2 [teh]decay Add water antinukes
 
 
 --------------------------------------------------------------------------------
 -- Speedups
 --------------------------------------------------------------------------------
 local arm_mobile_anti = UnitDefNames.armscab.id
+local arm_mobile_anti_water = UnitDefNames.armcarry.id
 local core_mobile_anti = UnitDefNames.cormabm.id
+local core_mobile_anti_water = UnitDefNames.corcarry.id
 
 local spGetActiveCommand = Spring.GetActiveCommand
 local spGetMouseState = Spring.GetMouseState
@@ -51,6 +53,8 @@ local mobileAntiOutOfLos = {}
 
 local coverageRangeArm = WeaponDefs[UnitDefNames.armscab.weapons[1].weaponDef].coverageRange
 local coverageRangeCore = WeaponDefs[UnitDefNames.cormabm.weapons[1].weaponDef].coverageRange
+local coverageRangeArmWater = WeaponDefs[UnitDefNames.armcarry.weapons[1].weaponDef].coverageRange
+local coverageRangeCoreWater = WeaponDefs[UnitDefNames.corcarry.weapons[1].weaponDef].coverageRange
 
 --------------------------------------------------------------------------------
 -- Callins
@@ -83,14 +87,28 @@ function widget:DrawWorld()
 end
 
 function widget:UnitEnteredLos(unitID)
+    processVisibleUnit(unitID)
+end
+
+function processVisibleUnit(unitID)
     local unitDefId = spGetUnitDefID(unitID);
-    if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti then
+    if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti or unitDefId == arm_mobile_anti_water or unitDefId == core_mobile_anti_water then
         local x, y, z = spGetUnitPosition(unitID)
         local pos = {}
         pos["x"] = x
         pos["y"] = y
         pos["z"] = z
-        pos.coverageRange = unitDefId == arm_mobile_anti and coverageRangeArm or coverageRangeCore
+
+        if unitDefId == arm_mobile_anti then
+            pos.coverageRange = coverageRangeArm
+        elseif unitDefId == arm_mobile_anti_water then
+            pos.coverageRange = coverageRangeArmWater
+        elseif unitDefId == core_mobile_anti then
+            pos.coverageRange = coverageRangeCore
+        else
+            pos.coverageRange = coverageRangeCoreWater
+        end
+
         mobileAntiInLos[unitID] = pos
         mobileAntiOutOfLos[unitID] = nil
     end
@@ -98,31 +116,38 @@ end
 
 function widget:UnitLeftLos(unitID)
     local unitDefId = spGetUnitDefID(unitID);
-    if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti then
-
+    if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti or unitDefId == arm_mobile_anti_water or unitDefId == core_mobile_anti_water then
         local x, y, z = spGetUnitPosition(unitID)
         local pos = {}
         pos["x"] = x or mobileAntiInLos[unitID].x
         pos["y"] = y or mobileAntiInLos[unitID].y
         pos["z"] = z or mobileAntiInLos[unitID].z
-        pos.coverageRange = unitDefId == arm_mobile_anti and coverageRangeArm or coverageRangeCore
-        mobileAntiOutOfLos[unitID] = pos
 
+        if unitDefId == arm_mobile_anti then
+            pos.coverageRange = coverageRangeArm
+        elseif unitDefId == arm_mobile_anti_water then
+            pos.coverageRange = coverageRangeArmWater
+        elseif unitDefId == core_mobile_anti then
+            pos.coverageRange = coverageRangeCore
+        else
+            pos.coverageRange = coverageRangeCoreWater
+        end
+
+        mobileAntiOutOfLos[unitID] = pos
         mobileAntiInLos[unitID] = nil
     end
 end
 
 function widget:UnitCreated(unitID, unitDefID, teamID, builderID)
-    local unitDefId = spGetUnitDefID(unitID);
-    if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti then
-        local x, y, z = spGetUnitPosition(unitID)
-        local pos = {}
-        pos["x"] = x
-        pos["y"] = y
-        pos["z"] = z
-        pos.coverageRange = unitDefId == arm_mobile_anti and coverageRangeArm or coverageRangeCore
-        mobileAntiInLos[unitID] = pos
-    end
+    processVisibleUnit(unitID)
+end
+
+function widget:UnitTaken(unitID, unitDefID, unitTeam, newTeam)
+    processVisibleUnit(unitID)
+end
+
+function widget:UnitGiven(unitID, unitDefID, unitTeam, oldTeam)
+    processVisibleUnit(unitID)
 end
 
 function widget:GameFrame(n)
@@ -133,23 +158,23 @@ function widget:GameFrame(n)
     end
 end
 
-function widget:Initialize()
+function widget:PlayerChanged(playerID)
     local _, _, spec, teamId = Spring.GetPlayerInfo(Spring.GetMyPlayerID())
 
     for _, unitID in ipairs(spGetTeamUnits(teamId)) do
-        local unitDefId = spGetUnitDefID(unitID);
-        if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti then
-            local x, y, z = spGetUnitPosition(unitID)
-            local pos = {}
-            pos["x"] = x
-            pos["y"] = y
-            pos["z"] = z
-            pos.coverageRange = unitDefId == arm_mobile_anti and coverageRangeArm or coverageRangeCore
-            mobileAntiInLos[unitID] = pos
-        end
+        processVisibleUnit(unitID)
     end
 
     return true
 end
 
+function widget:Initialize()
+    local _, _, spec, teamId = Spring.GetPlayerInfo(Spring.GetMyPlayerID())
+
+    for _, unitID in ipairs(spGetTeamUnits(teamId)) do
+        processVisibleUnit(unitID)
+    end
+
+    return true
+end
 --------------------------------------------------------------------------------
