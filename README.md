@@ -1,4 +1,3 @@
-gui_mobile_anti_defence_range
-=============================
-
 Balanced Annihilation widget - Mobile anti defence range
+=============================
+Draws circle to show mobile anti defence range
