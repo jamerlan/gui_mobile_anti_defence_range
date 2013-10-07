@@ -1,12 +1,12 @@
 --------------------------------------------------------------------------------
 function widget:GetInfo()
     return {
-        name      = "Mobile anti defence range v4",
+        name      = "Mobile anti defence range v5",
         desc      = "Draws circle to show mobile anti defence range",
         author    = "[teh]decay",
         date      = "5 oct 2013",
         license   = "GNU GPL, v2 or later",
-        version   = 4,
+        version   = 5,
         layer     = 5,
         enabled   = true  --  loaded by default?
     }
@@ -18,6 +18,7 @@ end
 -- v2 [teh]decay Add water antinukes
 -- v3 [teh]decay fix spectator mode
 -- v4 [teh]decay fix spectator mode when /specfullview is used
+-- v5 [teh]decay fix spectator mode again (thx to jK)
 
 --------------------------------------------------------------------------------
 -- Speedups
@@ -46,7 +47,7 @@ local spGetUnitVelocity = Spring.GetUnitVelocity
 local spMarkerAddPoint	= Spring.MarkerAddPoint
 local spGetTeamUnits	= Spring.GetTeamUnits
 local spGetPositionLosState = Spring.GetPositionLosState
-local spGetVisibleUnits = Spring.GetVisibleUnits
+local spGetAllUnits     = Spring.GetAllUnits
 local spGetSpectatingState = Spring.GetSpectatingState
 
 
@@ -198,7 +199,7 @@ function detectSpectatorView()
         spectatorMode = true
     end
 
-    local visibleUnits = spGetVisibleUnits()
+    local visibleUnits = spGetAllUnits()
     if visibleUnits ~= nil then
         for _, unitID in ipairs(visibleUnits) do
             processVisibleUnit(unitID)
