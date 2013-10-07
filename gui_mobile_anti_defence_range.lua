@@ -60,7 +60,7 @@ local coverageRangeArmWater = WeaponDefs[UnitDefNames.armcarry.weapons[1].weapon
 local coverageRangeCoreWater = WeaponDefs[UnitDefNames.corcarry.weapons[1].weaponDef].coverageRange
 
 local spectatorMode = false
-local inSpecfullmode = false
+local notInSpecfullmode = false
 
 --------------------------------------------------------------------------------
 -- Callins
@@ -68,13 +68,13 @@ local inSpecfullmode = false
 function widget:DrawWorldPreUnit()
     local _, specFullView, _ = spGetSpectatingState()
 
-    if specFullView then
-        inSpecfullmode = true
+    if not specFullView then
+        notInSpecfullmode = true
     else
-        if inSpecfullmode then
+        if notInSpecfullmode then
             detectSpectatorView()
         end
-        inSpecfullmode = false
+        notInSpecfullmode = false
     end
 
     for uID, pos in pairs(mobileAntiInLos) do
@@ -192,7 +192,7 @@ function widget:Initialize()
 end
 
 function detectSpectatorView()
-    local _, _, spec, teamId = Spring.GetPlayerInfo(Spring.GetMyPlayerID())
+    local _, _, spec, teamId = spGetPlayerInfo(spGetMyPlayerID())
 
     if spec then
         spectatorMode = true
