@@ -1,12 +1,12 @@
 --------------------------------------------------------------------------------
 function widget:GetInfo()
     return {
-        name      = "Mobile anti defence range",
+        name      = "Mobile anti defence range v3",
         desc      = "Draws circle to show mobile anti defence range",
         author    = "[teh]decay",
         date      = "5 oct 2013",
         license   = "GNU GPL, v2 or later",
-        version   = 2,
+        version   = 3,
         layer     = 5,
         enabled   = true  --  loaded by default?
     }
@@ -16,7 +16,7 @@ end
 
 --Changelog
 -- v2 [teh]decay Add water antinukes
-
+-- v3 [teh]decay fix spectator mode
 
 --------------------------------------------------------------------------------
 -- Speedups
@@ -56,6 +56,8 @@ local coverageRangeCore = WeaponDefs[UnitDefNames.cormabm.weapons[1].weaponDef].
 local coverageRangeArmWater = WeaponDefs[UnitDefNames.armcarry.weapons[1].weaponDef].coverageRange
 local coverageRangeCoreWater = WeaponDefs[UnitDefNames.corcarry.weapons[1].weaponDef].coverageRange
 
+local spectatorMode = false
+
 --------------------------------------------------------------------------------
 -- Callins
 --------------------------------------------------------------------------------
@@ -87,7 +89,9 @@ function widget:DrawWorld()
 end
 
 function widget:UnitEnteredLos(unitID)
-    processVisibleUnit(unitID)
+    if not spectatorMode then
+        processVisibleUnit(unitID)
+    end
 end
 
 function processVisibleUnit(unitID)
@@ -115,26 +119,28 @@ function processVisibleUnit(unitID)
 end
 
 function widget:UnitLeftLos(unitID)
-    local unitDefId = spGetUnitDefID(unitID);
-    if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti or unitDefId == arm_mobile_anti_water or unitDefId == core_mobile_anti_water then
-        local x, y, z = spGetUnitPosition(unitID)
-        local pos = {}
-        pos["x"] = x or mobileAntiInLos[unitID].x
-        pos["y"] = y or mobileAntiInLos[unitID].y
-        pos["z"] = z or mobileAntiInLos[unitID].z
+    if not spectatorMode then
+        local unitDefId = spGetUnitDefID(unitID);
+        if unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti or unitDefId == arm_mobile_anti_water or unitDefId == core_mobile_anti_water then
+            local x, y, z = spGetUnitPosition(unitID)
+            local pos = {}
+            pos["x"] = x or mobileAntiInLos[unitID].x
+            pos["y"] = y or mobileAntiInLos[unitID].y
+            pos["z"] = z or mobileAntiInLos[unitID].z
 
-        if unitDefId == arm_mobile_anti then
-            pos.coverageRange = coverageRangeArm
-        elseif unitDefId == arm_mobile_anti_water then
-            pos.coverageRange = coverageRangeArmWater
-        elseif unitDefId == core_mobile_anti then
-            pos.coverageRange = coverageRangeCore
-        else
-            pos.coverageRange = coverageRangeCoreWater
+            if unitDefId == arm_mobile_anti then
+                pos.coverageRange = coverageRangeArm
+            elseif unitDefId == arm_mobile_anti_water then
+                pos.coverageRange = coverageRangeArmWater
+            elseif unitDefId == core_mobile_anti then
+                pos.coverageRange = coverageRangeCore
+            else
+                pos.coverageRange = coverageRangeCoreWater
+            end
+
+            mobileAntiOutOfLos[unitID] = pos
+            mobileAntiInLos[unitID] = nil
         end
-
-        mobileAntiOutOfLos[unitID] = pos
-        mobileAntiInLos[unitID] = nil
     end
 end
 
@@ -159,22 +165,36 @@ function widget:GameFrame(n)
 end
 
 function widget:PlayerChanged(playerID)
-    local _, _, spec, teamId = Spring.GetPlayerInfo(Spring.GetMyPlayerID())
-
-    for _, unitID in ipairs(spGetTeamUnits(teamId)) do
-        processVisibleUnit(unitID)
-    end
-
+    detectSpectatorView()
     return true
 end
 
 function widget:Initialize()
-    local _, _, spec, teamId = Spring.GetPlayerInfo(Spring.GetMyPlayerID())
-
-    for _, unitID in ipairs(spGetTeamUnits(teamId)) do
-        processVisibleUnit(unitID)
-    end
-
+    detectSpectatorView()
     return true
 end
+
+function detectSpectatorView()
+    local _, _, spec, teamId = Spring.GetPlayerInfo(Spring.GetMyPlayerID())
+
+    if spec then
+        spectatorMode = true
+
+        local roster = Spring.GetPlayerRoster(1, true)
+        for _, player in ipairs(roster) do
+            local teamId = player[3]
+            if teamId ~= nil then
+                Spring.Echo("teamId" .. teamId)
+                for _, unitID in ipairs(spGetTeamUnits(teamId)) do
+                    processVisibleUnit(unitID)
+                end
+            end
+        end
+    else
+        for _, unitID in ipairs(spGetTeamUnits(teamId)) do
+            processVisibleUnit(unitID)
+        end
+    end
+end
+
 --------------------------------------------------------------------------------
