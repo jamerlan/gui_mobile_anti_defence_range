@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 function widget:GetInfo()
     return {
-        name      = "Anti Ranges",
+        name      = "Anti Ranges v3",
         desc      = "Draws circle to show anti defence ranges (options: /antiranges_glow, antiranges_fade)",
         author    = "[teh]decay, Floris",
         date      = "25 january 2015",
@@ -32,7 +32,8 @@ end
 
 local opacityMultiplier			= 0.85
 local multiStockpileColor		= {1,1,0}
-local filledStockpileColor		= {1,0.73,0}
+local filledStockpileColor		= {1,0.73,0 }
+local unknownStockpileColor		= {1,0.73,1}
 local emptyStockpileColor		= {1,0.28,0}
 local showLineGlow				= true
 local fadeOnCloseup        		= true
@@ -49,11 +50,6 @@ local core_anti					= UnitDefNames.corfmd.id
 local core_mobile_anti			= UnitDefNames.cormabm.id
 local core_mobile_anti_water	= UnitDefNames.corcarry.id
 
-local spGetActiveCommand		= Spring.GetActiveCommand
-local spGetMouseState			= Spring.GetMouseState
-local spTraceScreenRay			= Spring.TraceScreenRay
-local spPos2BuildPos			= Spring.Pos2BuildPos
-
 local glColor					= gl.Color
 local glDepthTest				= gl.DepthTest
 local glLineWidth				= gl.LineWidth
@@ -62,12 +58,8 @@ local glDrawGroundCircle		= gl.DrawGroundCircle
 
 local spGetMyPlayerID			= Spring.GetMyPlayerID
 local spGetPlayerInfo			= Spring.GetPlayerInfo
-local spGetMyAllyTeamID			= Spring.GetMyAllyTeamID
 local spGetUnitDefID			= Spring.GetUnitDefID
 local spGetUnitPosition			= Spring.GetUnitPosition
-local spGetUnitVelocity			= Spring.GetUnitVelocity
-local spMarkerAddPoint			= Spring.MarkerAddPoint
-local spGetTeamUnits			= Spring.GetTeamUnits
 local spGetPositionLosState 	= Spring.GetPositionLosState
 local spGetCameraPosition		= Spring.GetCameraPosition
 local spGetUnitStockpile		= Spring.GetUnitStockpile
@@ -93,6 +85,15 @@ local coverageRangeCoreWater	= WeaponDefs[UnitDefNames.corcarry.weapons[1].weapo
 function widget:DrawWorld()
     if Spring.IsGUIHidden() then return end
 	local camX, camY, camZ = spGetCameraPosition()
+
+    for uID, pos in pairs(antiInLos) do
+        local LosOrRadar, inLos, inRadar = spGetPositionLosState(pos.x, pos.y, pos.z)
+        if not inLos then
+            antiOutLos[uID] = pos
+            antiInLos[uID] = nil
+        end
+    end
+
     for uID, pos in pairs(antiInLos) do
         local x, y, z = spGetUnitPosition(uID)
         
@@ -105,6 +106,7 @@ function widget:DrawWorld()
         local LosOrRadar, inLos, inRadar = spGetPositionLosState(pos.x, pos.y, pos.z)
         if inLos then
             antiOutLos[uID] = nil
+            antiInLos[uID] = pos
         end
     end
 
@@ -136,9 +138,12 @@ function drawCircle(uID, coverageRange, x, y, z, camX, camY, camZ)
 	lineOpacityMultiplier = lineOpacityMultiplier * opacityMultiplier
 	
 	if lineOpacityMultiplier > 0 then
-		local numStockpiled,numStockpileQued,stockpileBuild = spGetUnitStockpile(uID)
+		local numStockpiled, numStockpileQued, stockpileBuild = spGetUnitStockpile(uID)
 		local circleColor = emptyStockpileColor
-		if numStockpiled == 1 then
+
+        if numStockpiled == nil then
+            circleColor = unknownStockpileColor
+		elseif numStockpiled == 1 then
 			circleColor = filledStockpileColor
 		elseif numStockpiled > 1 then
 			circleColor = multiStockpileColor
@@ -163,7 +168,8 @@ end
 
 function processVisibleUnit(unitID)
     local unitDefId = spGetUnitDefID(unitID);
-    if unitDefId == arm_anti or unitDefId == core_anti or unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti or unitDefId == arm_mobile_anti_water or unitDefId == core_mobile_anti_water then
+    if unitDefId == arm_anti or unitDefId == core_anti or unitDefId == arm_mobile_anti or unitDefId == core_mobile_anti
+            or unitDefId == arm_mobile_anti_water or unitDefId == core_mobile_anti_water then
         local x, y, z = spGetUnitPosition(unitID)
         local pos = {}
         pos["x"] = x
