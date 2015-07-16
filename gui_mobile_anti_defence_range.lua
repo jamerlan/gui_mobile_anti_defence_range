@@ -1,12 +1,12 @@
 --------------------------------------------------------------------------------
 function widget:GetInfo()
     return {
-        name      = "Anti Ranges v3",
+        name      = "Anti Ranges v4",
         desc      = "Draws circle to show anti defence ranges (options: /antiranges_glow, antiranges_fade)",
         author    = "[teh]decay, Floris",
         date      = "25 january 2015",
         license   = "GNU GPL, v2 or later",
-        version   = 3,
+        version   = 4,
         layer     = 5,
         enabled   = true  --  loaded by default?
     }
@@ -16,8 +16,8 @@ end
 
 --Changelog
 -- v2 [teh]decay:  Add water antinukes
--- v3 Floris:  added normal anti, changed widget name, optional glow, optional fadeout on closeup, changed line thickness and opacity, empty anti uses different color
-
+-- v3 Floris: added normal anti, changed widget name, optional glow, optional fadeout on closeup, changed line thickness and opacity, empty anti uses different color
+-- v4 Floris: fixed nil error
 
 --------------------------------------------------------------------------------
 -- Console commands
@@ -32,9 +32,10 @@ end
 
 local opacityMultiplier			= 0.85
 local multiStockpileColor		= {1,1,0}
-local filledStockpileColor		= {1,0.73,0 }
-local unknownStockpileColor		= {1,0.73,1}
-local emptyStockpileColor		= {1,0.28,0}
+local filledStockpileColor		= {1,0.75,0}
+local unknownStockpileColor		= {1,0.54,1}
+local emptyStockpileColor		= {1,0.33,0}
+local unfinishedStockpileColor	= {1,0,0.75}
 local showLineGlow				= true
 local fadeOnCloseup        		= true
 local fadeStartDistance			= 3300
@@ -64,6 +65,7 @@ local spGetPositionLosState 	= Spring.GetPositionLosState
 local spGetCameraPosition		= Spring.GetCameraPosition
 local spGetUnitStockpile		= Spring.GetUnitStockpile
 local spGetAllUnits    			= Spring.GetAllUnits
+local GetUnitHealth				= Spring.GetUnitHealth
 
 local antiInLos					= {}
 local antiOutLos				= {}
@@ -82,9 +84,9 @@ local coverageRangeCoreWater	= WeaponDefs[UnitDefNames.corcarry.weapons[1].weapo
 
 
 
-function widget:DrawWorld()
+function widget:DrawWorldPreUnit()
     if Spring.IsGUIHidden() then return end
-	local camX, camY, camZ = spGetCameraPosition()
+    local camX, camY, camZ = spGetCameraPosition()
 
     for uID, pos in pairs(antiInLos) do
         local LosOrRadar, inLos, inRadar = spGetPositionLosState(pos.x, pos.y, pos.z)
@@ -96,9 +98,9 @@ function widget:DrawWorld()
 
     for uID, pos in pairs(antiInLos) do
         local x, y, z = spGetUnitPosition(uID)
-        
+
         if x ~= nil and y ~= nil and z ~= nil then
-			drawCircle(uID, pos.coverageRange, x, y, z, camX, camY, camZ)
+            drawCircle(uID, pos.coverageRange, x, y, z, camX, camY, camZ)
         end
     end
 
@@ -112,53 +114,58 @@ function widget:DrawWorld()
 
     for uID, pos in pairs(antiOutLos) do
         if pos.x ~= nil and pos.y ~= nil and pos.z ~= nil then
-			drawCircle(uID, pos.coverageRange, pos.x, pos.y, pos.z, camX, camY, camZ)
+            drawCircle(uID, pos.coverageRange, pos.x, pos.y, pos.z, camX, camY, camZ)
         end
     end
 end
 
 
 function drawCircle(uID, coverageRange, x, y, z, camX, camY, camZ)
-	local xDifference = camX - x
-	local yDifference = camY - y
-	local zDifference = camZ - z
-	local camDistance = math.sqrt(xDifference*xDifference + yDifference*yDifference + zDifference*zDifference)
-	
-	local lineWidthMinus = (camDistance/fadeStartDistance)
-	if lineWidthMinus > 2 then
-		lineWidthMinus = 2
-	end
-	local lineOpacityMultiplier = 1
-	if fadeOnCloseup then
-		lineOpacityMultiplier = (camDistance - fadeStartDistance) / 1800
-		if lineOpacityMultiplier > 1 then
-			lineOpacityMultiplier = 1
-		end
-	end
-	lineOpacityMultiplier = lineOpacityMultiplier * opacityMultiplier
-	
-	if lineOpacityMultiplier > 0 then
-		local numStockpiled, numStockpileQued, stockpileBuild = spGetUnitStockpile(uID)
-		local circleColor = emptyStockpileColor
+    local xDifference = camX - x
+    local yDifference = camY - y
+    local zDifference = camZ - z
+    local camDistance = math.sqrt(xDifference*xDifference + yDifference*yDifference + zDifference*zDifference)
 
-        if numStockpiled == nil then
-            circleColor = unknownStockpileColor
-		elseif numStockpiled == 1 then
-			circleColor = filledStockpileColor
-		elseif numStockpiled > 1 then
-			circleColor = multiStockpileColor
-		end
-		
-		glDepthTest(true)
-		if showLineGlow then
-			glLineWidth(10)
-			glColor(circleColor[1],circleColor[2],circleColor[3], .016*lineOpacityMultiplier)
-			glDrawGroundCircle(x, y, z, coverageRange, 256)
-		end
-		glColor(circleColor[1],circleColor[2],circleColor[3], .5*lineOpacityMultiplier)
-		glLineWidth(3-lineWidthMinus)
-		glDrawGroundCircle(x, y, z, coverageRange, 256)
-	end
+    local lineWidthMinus = (camDistance/fadeStartDistance)
+    if lineWidthMinus > 2 then
+        lineWidthMinus = 2
+    end
+    local lineOpacityMultiplier = 1
+    if fadeOnCloseup then
+        lineOpacityMultiplier = (camDistance - fadeStartDistance) / 1800
+        if lineOpacityMultiplier > 1 then
+            lineOpacityMultiplier = 1
+        end
+    end
+    lineOpacityMultiplier = lineOpacityMultiplier * opacityMultiplier
+
+    if lineOpacityMultiplier > 0 then
+        local numStockpiled, numStockpileQued, stockpileBuild = spGetUnitStockpile(uID)
+        local circleColor = emptyStockpileColor
+
+        local _,_,_,_,build = GetUnitHealth(uID)
+        if build ~= nil and build < 1 then
+            circleColor = unfinishedStockpileColor
+        else
+            if numStockpiled == nil then
+                circleColor = unknownStockpileColor
+            elseif numStockpiled == 1 then
+                circleColor = filledStockpileColor
+            elseif numStockpiled > 1 then
+                circleColor = multiStockpileColor
+            end
+        end
+
+        glDepthTest(true)
+        if showLineGlow then
+            glLineWidth(10)
+            glColor(circleColor[1],circleColor[2],circleColor[3], .016*lineOpacityMultiplier)
+            glDrawGroundCircle(x, y, z, coverageRange, 256)
+        end
+        glColor(circleColor[1],circleColor[2],circleColor[3], .5*lineOpacityMultiplier)
+        glLineWidth(3-lineWidthMinus)
+        glDrawGroundCircle(x, y, z, coverageRange, 256)
+    end
 end
 
 
@@ -240,21 +247,21 @@ function widget:GameFrame(n)
 end
 
 function widget:Initialize()
-	checkAllUnits()
+    checkAllUnits()
 end
 
 function widget:PlayerChanged(playerID)
-	checkAllUnits()
+    checkAllUnits()
 end
 
 
 function checkAllUnits()
     local _, _, spec, teamId = spGetPlayerInfo(spGetMyPlayerID())
-	
-	antiInLos				= {}
-	antiOutLos				= {}
-	
-	local allUnits = spGetAllUnits()
+
+    antiInLos				= {}
+    antiOutLos				= {}
+
+    local allUnits = spGetAllUnits()
     for _, unitID in ipairs(allUnits) do
         processVisibleUnit(unitID)
     end
@@ -275,20 +282,20 @@ function widget:SetConfigData(data)
 end
 
 function widget:TextCommand(command)
-    if (string.find(command, "antiranges_glow") == 1  and  string.len(command) == 15) then 
-		showLineGlow = not showLineGlow
-		if showLineGlow then
-			Spring.Echo("Anti Ranges:  Glow on")
-		else
-			Spring.Echo("Anti Ranges:  Glow off")
-		end
-	end
-    if (string.find(command, "antiranges_fade") == 1  and  string.len(command) == 15) then 
-		fadeOnCloseup = not fadeOnCloseup
-		if fadeOnCloseup then
-			Spring.Echo("Anti Ranges:  Fade-out on closeup enabled")
-		else
-			Spring.Echo("Anti Ranges:  Fade-out on closeup disabled")
-		end
-	end
+    if (string.find(command, "antiranges_glow") == 1  and  string.len(command) == 15) then
+        showLineGlow = not showLineGlow
+        if showLineGlow then
+            Spring.Echo("Anti Ranges:  Glow on")
+        else
+            Spring.Echo("Anti Ranges:  Glow off")
+        end
+    end
+    if (string.find(command, "antiranges_fade") == 1  and  string.len(command) == 15) then
+        fadeOnCloseup = not fadeOnCloseup
+        if fadeOnCloseup then
+            Spring.Echo("Anti Ranges:  Fade-out on closeup enabled")
+        else
+            Spring.Echo("Anti Ranges:  Fade-out on closeup disabled")
+        end
+    end
 end
